@@ -1,0 +1,4 @@
+-r server.txt
+-r desktop.txt
+pytest>=8,<10
+pyinstaller>=6,<7
