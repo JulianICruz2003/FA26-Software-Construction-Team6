@@ -50,6 +50,17 @@ Install these before following the setup:
 
 Qt Designer is installed with PySide6. You do **not** need a separate Qt installation for this starter.
 
+## Get the source code
+
+Clone the team repository, then enter the project directory:
+
+```bash
+git clone https://github.com/JulianICruz2003/FA26-Software-Construction-Team6.git
+cd FA26-Software-Construction-Team6
+```
+
+If you already have a working local checkout, use that directory instead of cloning a second copy. All the commands below are run from the repository root (the directory containing `compose.yaml`, `desktop/`, and `server/`).
+
 ## First-time setup — macOS / Linux
 
 Run these commands **from the repository root** in Terminal:
@@ -63,6 +74,56 @@ cp .env.example .env
 ```
 
 If `python3.12` is not found, check your Python installation and use a verified Python 3.12 executable. Never commit `.env`.
+
+### macOS: workaround for a Qt Cocoa plugin error
+
+If the app fails with **`Could not find the Qt platform plugin "cocoa"`**, you may be using a virtual environment whose Qt plugin files cannot be discovered. On one development Mac, `libqcocoa.dylib` existed in the `.venv` directory but was repeatedly marked `hidden`; changing the flag did not persist. A separate virtual environment outside the Desktop directory was used as a workaround. This issue is not necessarily caused by iCloud or Conda, and it does not require edits to the application source code.
+
+From the repository root, create a fresh environment **outside the project/Desktop**:
+
+```bash
+# If another virtual environment is active:
+deactivate
+# If Conda (base) is active, also run: conda deactivate
+
+mkdir -p "$HOME/.venvs"
+python3.12 -m venv "$HOME/.venvs/miner-project-hub"
+source "$HOME/.venvs/miner-project-hub/bin/activate"
+python -m pip install --upgrade pip
+python -m pip install -r requirements/dev.txt
+```
+
+If you have not created the configuration file yet:
+
+```bash
+cp .env.example .env
+```
+
+Test Qt *before* starting the desktop app:
+
+```bash
+python -c 'from PySide6.QtWidgets import QApplication; app = QApplication([]); print("Qt works!")'
+```
+
+If this prints `Qt works!`, launch the application after starting Docker and FastAPI (see **Run locally**):
+
+```bash
+python -m desktop.main
+```
+
+For later terminal sessions, activate the external environment with:
+
+```bash
+source "$HOME/.venvs/miner-project-hub/bin/activate"
+```
+
+If VS Code continues to activate the old `.venv`, use **Command Palette → Python: Select Interpreter → Enter interpreter path**, then select `~/.venvs/miner-project-hub/bin/python`. You can also bypass activation for a one-off launch:
+
+```bash
+"$HOME/.venvs/miner-project-hub/bin/python" -m desktop.main
+```
+
+Do **not** commit either environment to Git; the external `~/.venvs` folder is outside this repository, and the local `.venv/` directory is ignored.
 
 ## First-time setup — Windows (PowerShell)
 
@@ -80,12 +141,15 @@ If PowerShell blocks activation, use Command Prompt with `.venv\Scripts\activate
 
 ## Run locally (macOS, Linux, or Windows)
 
-Use **three terminal sessions** with the repository root as the working directory. Ensure the virtual environment is active in the terminals running Python.
+Use **three terminal sessions** with the repository root as the working directory. Ensure the virtual environment is active in the terminals running Python. On macOS, activate the environment you chose during setup; if you used the Cocoa workaround, use `source "$HOME/.venvs/miner-project-hub/bin/activate"` rather than `source .venv/bin/activate`.
+
+**Before starting:** Open **Docker Desktop** and confirm that its engine is running. Docker's command-line tool can be installed even when the Docker daemon is stopped.
 
 **Terminal 1 — Start PostgreSQL**
 
 ```bash
 docker compose up -d db
+docker compose ps
 ```
 
 On first run (and after future schema changes), apply database migrations:
@@ -106,7 +170,7 @@ The local API listens on `http://127.0.0.1:8000` by default. If port 8000 is alr
 - Database health: http://127.0.0.1:8000/health/db
 - Interactive API docs (development only): http://127.0.0.1:8000/docs
 
-**Local database port:** This development setup uses host port **5433** for PostgreSQL (configured in `compose.yaml` and `.env`, because 5432 was occupied). Inside the Docker network, PostgreSQL still listens on 5432. Check your own `compose.yaml` and `.env` before changing this.
+**Local database port:** One development machine uses PostgreSQL on host port **5433** because `5432` was occupied. The starter `.env.example` and `compose.yaml` **default to 5432**; you can leave that default if it is free. If it is occupied, set `POSTGRES_PORT=5433` in your own `.env` (the Compose file uses that variable). Inside the container PostgreSQL still listens on 5432. Do not commit your personal `.env`.
 
 **Terminal 3 — Launch desktop software**
 
@@ -160,7 +224,7 @@ With your Python environment active, run:
 pyside6-designer
 ```
 
-Designer saves `.ui` files. You can generate Python from a `.ui` file using `pyside6-uic`, or load the UI at runtime. Much of the existing desktop UI is currently built directly in Python. On some macOS setups, PySide6 Qt plugins may need `chflags -R nohidden "$VIRTUAL_ENV/lib/python3.12/site-packages/PySide6/Qt/plugins"` to become visible.
+Designer saves `.ui` files. You can generate Python from a `.ui` file using `pyside6-uic`, or load the UI at runtime. Much of the existing desktop UI is currently built directly in Python. If Qt cannot find Cocoa on macOS, follow the **macOS Qt workaround** above rather than repeatedly running `chflags` without checking whether it changes the plugin flag.
 
 ## Running tests
 
@@ -196,7 +260,7 @@ Copy `.env.example` into `.env`. Keep `.env` private and out of Git.
 | `POSTGRES_PASSWORD` | Development PostgreSQL password (change sample value) |
 | `POSTGRES_DB` | Database name |
 | `POSTGRES_HOST` | Database hostname as seen by local API (`127.0.0.1` for this starter) |
-| `POSTGRES_PORT` | Host-side PostgreSQL port (currently `5433` in this local setup) |
+| `POSTGRES_PORT` | Host-side PostgreSQL port (`5432` by default; use `5433` if `5432` is occupied) |
 | `API_BASE_URL` | API URL used by the desktop app |
 
 **Note:** After a Docker PostgreSQL volume has already been initialized, changing the password in `.env` alone won't change the database user's existing password. Reset it explicitly or recreate a disposable development volume if you can afford to lose its data.
@@ -264,16 +328,18 @@ miner-project-hub/
 - [ ] Distinct student and professor dashboards
 - [ ] Courses, reviews, project assignments, diagrams, and activity history
 - [ ] Multi-device synchronization and deployment
-- [ ] Packaging, backup/restore, security review, and documentation
+- [ ] Packaging, backup/restore, security review, and final documentation
 
 ## Troubleshooting
 
 - **`python3.12` / `py -3.12` is missing:** Install Python 3.12 and restart your terminal.
-- **Docker isn't responding:** Start Docker Desktop, then check `docker compose ps`.
+- **Docker cannot connect to `~/.docker/run/docker.sock`:** Start Docker Desktop, wait until the engine is running, then retry `docker compose up -d db` and check `docker compose ps`.
 - **Database is not ready:** Wait for `docker compose ps` to show healthy, inspect `docker compose logs db`, and run migrations again.
-- **Port 5432 already used:** The current local setup uses host port 5433. If you change it, update both `compose.yaml` and `POSTGRES_PORT` in `.env`.
+- **Port 5432 already used:** Set `POSTGRES_PORT=5433` in your local `.env`, then rerun `docker compose up -d db` (the provided Compose config reads that variable).
 - **Cannot connect from another computer:** `127.0.0.1` always means *that computer*. A deployed API needs its own reachable address and HTTPS configuration.
-- **Qt window does not open:** Check PySide6 in the active `.venv`, launch in a normal graphical desktop session, and see the macOS Qt plugin note above.
+- **Qt cannot find `cocoa`:** Check which Python is active (`which python` or `python -c "import sys; print(sys.executable)"`). On macOS, follow the external-virtual-environment workaround above. If it persists, diagnose using `QT_DEBUG_PLUGINS=1 python -m desktop.main`.
+- **Projects do not load (`[Errno 61] Connection refused`):** Start FastAPI; confirm that `API_BASE_URL` in `.env` matches the running port, typically `http://127.0.0.1:8000`. Check `/health` and `/projects` in a browser.
+- **Port 8000 already in use:** Another process may already be serving an old copy of the API. Check `lsof -nP -iTCP:8000 -sTCP:LISTEN` on macOS and stop the appropriate old server before starting a new one.
 - **Users/Teams endpoints missing in Swagger:** Verify `server/main.py` imports and includes the routers, then restart the Uvicorn process serving the configured API port.
 - **Add Existing Member finds no users:** Create a development user with **Create New Member** first; existing members are excluded from the dropdown.
 
