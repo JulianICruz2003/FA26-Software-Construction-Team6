@@ -26,10 +26,7 @@ def create_project(
     data: ProjectCreate,
     db: Session = Depends(get_session)
 ):
-    project = Project(
-        name=data.name,
-        description=data.description
-    )
+    project = Project(**data.model_dump())
 
     db.add(project)
     db.commit()

@@ -114,10 +114,7 @@ class ProjectsPage(QWidget):
             project_data = dialog.get_data()
 
             try:
-                self.api_client.create_project(
-                    project_data["name"],
-                    project_data["description"]
-                )
+                self.api_client.create_project(**project_data)
 
             except httpx.HTTPError as error:
                 QMessageBox.warning(
