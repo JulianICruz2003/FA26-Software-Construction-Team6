@@ -232,7 +232,17 @@ Designer saves `.ui` files. You can generate Python from a `.ui` file using `pys
 python -m pytest -q
 ```
 
-The included test checks `/health` without requiring a running database. Once database-backed APIs are developed, add isolated integration tests using a disposable test database.
+The default suite runs without PostgreSQL. To include the PostgreSQL integration
+tests, start Docker and run:
+
+```bash
+RUN_POSTGRES_TESTS=1 python -m pytest -q
+```
+
+The integration suite starts its own PostgreSQL 17 container on a dynamically
+assigned loopback port, applies Alembic migrations, and removes the container
+after the run. It uses a temporary data volume and does not use the development
+database or its credentials. GitHub Actions enables the integration suite.
 
 ## Building installable desktop software
 

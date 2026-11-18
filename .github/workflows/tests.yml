@@ -23,4 +23,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements/server.txt -r requirements/desktop.txt "pytest>=8,<10"
       - name: Run tests
+        env:
+          RUN_POSTGRES_TESTS: "1"
         run: python -m pytest -q
