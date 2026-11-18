@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -5,6 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=500)
+    deadline: date | None = None
+    team_name: str | None = Field(default=None, max_length=120)
 
     @field_validator("name")
     @classmethod
@@ -21,6 +24,8 @@ class ProjectRead(BaseModel):
     id: int
     name: str
     description: str
+    deadline: date | None
+    team_name: str | None
 
 
 class TaskCreate(BaseModel):

@@ -38,6 +38,7 @@ class CreateProjectDialog(QDialog):
         # Team name
         self.team_name = QLineEdit()
         self.team_name.setPlaceholderText("Optional team name")
+        self.team_name.setMaxLength(120)
 
         # Add fields to the form
         form.addRow("Project Name:", self.project_name)
@@ -72,5 +73,5 @@ class CreateProjectDialog(QDialog):
             "name": self.project_name.text().strip(),
             "description": self.description.toPlainText().strip(),
             "deadline": self.deadline.date().toString("yyyy-MM-dd"),
-            "team_name": self.team_name.text().strip(),
+            "team_name": self.team_name.text().strip() or None,
         }
