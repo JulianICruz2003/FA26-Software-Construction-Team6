@@ -1,4 +1,5 @@
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -38,6 +39,13 @@ class OverviewTab(QWidget):
         self.deadline_label = QLabel("Not configured")
         deadline_layout.addWidget(self.deadline_label)
 
+        team_name_group = QGroupBox("Team Name")
+        team_name_layout = QVBoxLayout(team_name_group)
+        self.team_name_label = QLabel("Not configured")
+        self.team_name_label.setTextFormat(Qt.TextFormat.PlainText)
+        self.team_name_label.setWordWrap(True)
+        team_name_layout.addWidget(self.team_name_label)
+
         tasks_group = QGroupBox("Tasks")
         tasks_layout = QVBoxLayout(tasks_group)
         self.tasks_label = QLabel("Not implemented")
@@ -52,6 +60,7 @@ class OverviewTab(QWidget):
         info_layout.addWidget(deadline_group, 0, 1)
         info_layout.addWidget(tasks_group, 1, 0)
         info_layout.addWidget(team_group, 1, 1)
+        info_layout.addWidget(team_name_group, 2, 0)
 
         layout.addLayout(info_layout)
         layout.addStretch()
@@ -62,3 +71,5 @@ class OverviewTab(QWidget):
             project.get("description")
             or "No description provided."
         )
+        self.deadline_label.setText(project.get("deadline") or "Not configured")
+        self.team_name_label.setText(project.get("team_name") or "Not configured")

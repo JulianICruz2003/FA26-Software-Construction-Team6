@@ -2,15 +2,8 @@ from unittest.mock import Mock
 
 import httpx
 import pytest
-from PySide6.QtWidgets import QApplication
 
 from desktop.pages.project_workspace import ProjectWorkspacePage
-
-
-@pytest.fixture
-def qt_app(monkeypatch):
-    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
-    return QApplication.instance() or QApplication([])
 
 
 @pytest.mark.parametrize(

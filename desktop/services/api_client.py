@@ -50,13 +50,15 @@ class ApiClient:
             response.raise_for_status()
             return response.json()
 
-    def create_project(self, name, description):
+    def create_project(self, name, description, *, deadline=None, team_name=None):
         with httpx.Client(timeout=5.0) as client:
             response = client.post(
                 f"{self.base_url}/projects",
                 json={
                     "name": name,
-                    "description": description
+                    "description": description,
+                    "deadline": deadline,
+                    "team_name": team_name,
                 }
             )
             response.raise_for_status()

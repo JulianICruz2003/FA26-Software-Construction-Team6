@@ -1,7 +1,7 @@
 """Initial database model. Project APIs are not implemented yet."""
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import Date, DateTime, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from sqlalchemy import ForeignKey, String, UniqueConstraint
@@ -19,6 +19,8 @@ class Project(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    deadline: Mapped[date | None] = mapped_column(Date)
+    team_name: Mapped[str | None] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
