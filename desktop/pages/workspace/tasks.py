@@ -72,28 +72,45 @@ class TasksTab(QWidget):
         self.complete_button = QPushButton("Mark Complete")
         layout.addWidget(self.complete_button)
 
+        self.load_status = QLabel()
+        self.load_status.setWordWrap(True)
+        self.load_status.hide()
+        layout.addWidget(self.load_status)
+
+        self.retry_button = QPushButton("Retry Loading Tasks")
+        self.retry_button.hide()
+        layout.addWidget(self.retry_button)
+
+        self.set_task_actions_enabled(False)
+
         # Connect signals
         self.add_button.clicked.connect(self.add_task)
         self.task_input.returnPressed.connect(self.add_task)
         self.complete_button.clicked.connect(self.mark_complete)
+        self.retry_button.clicked.connect(self.load_tasks)
+
+    def set_task_actions_enabled(self, enabled):
+        self.task_input.setEnabled(enabled)
+        self.add_button.setEnabled(enabled)
+        self.complete_button.setEnabled(enabled)
 
     def load_tasks(self):
         if self.project_id is None:
             return
 
+        self.task_table.setRowCount(0)
+        self.set_task_actions_enabled(False)
+        self.retry_button.hide()
+        self.load_status.hide()
+
         try:
             tasks = self.api_client.get_tasks(self.project_id)
 
         except (httpx.HTTPError, ValueError) as error:
-            QMessageBox.warning(
-                self,
-                "Connection Error",
-                f"Could not load tasks:\n{error}"
-            )
+            self.load_status.setText(f"Could not load tasks:\n{error}")
+            self.load_status.show()
+            self.retry_button.show()
             return
-
-        # Clear the table before loading database records
-        self.task_table.setRowCount(0)
 
         for task in tasks:
             row = self.task_table.rowCount()
@@ -115,6 +132,8 @@ class TasksTab(QWidget):
             self.task_table.setItem(
                 row, 1, QTableWidgetItem(status_text)
             )
+
+        self.set_task_actions_enabled(True)
 
     def add_task(self):
         title = self.task_input.text().strip()
