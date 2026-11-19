@@ -22,22 +22,7 @@ Miner Project Hub is designed as **installable desktop software**, not a website
 
 ## Architecture
 
-```text
-             PySide6 desktop app
-                     |
-                 HTTPX client
-                     |
-                 FastAPI API
-                     |
-                  SQLAlchemy
-                     |
-                  PostgreSQL
-
-      Future: HTTPS, authentication, roles,
-      shared file storage, multi-device access
-```
-
-During local development, the desktop and API run on the same computer. In a future deployment, users install **only the desktop app**; the API and database run on a separate server. Desktop clients must never receive direct PostgreSQL credentials. A Student/Professor-specific interface is planned but **not yet implemented**.
+The PySide6 desktop calls FastAPI over HTTP. The API uses SQLAlchemy and psycopg to reach PostgreSQL, which runs in Docker Compose for local development. Alembic manages the database schema. See the [architecture guide](docs/architecture.md) for the diagram, API routes, database models, and planned access controls.
 
 ## Prerequisites
 
@@ -188,7 +173,7 @@ Press **Check connection**. It should show whether the API and PostgreSQL are re
 | Tasks | List, create, and mark tasks complete for the selected project; saved in PostgreSQL |
 | Team | List, add, and remove project memberships; create development user records; saved in PostgreSQL |
 | Files | Select/remove local files in the UI only; no upload, download, or persistence yet |
-| Overview | Displays selected project information; some values remain placeholders |
+| Overview | Shows the project description, deadline, and team name. Status and summary counts remain placeholders |
 | Diagrams, Activity, Courses, Reviews | Planned or placeholder features |
 | Sign-in and distinct Student/Professor views | **Not yet implemented**; a `Student` or `Professor` field on a user record is not authentication |
 
