@@ -79,26 +79,30 @@ def postgres_engine():
 
 
 @pytest.fixture
-def api(postgres_engine, monkeypatch):
+def db_connection(postgres_engine):
     # Each request can commit its own savepoint. Roll back the outer transaction
     # to isolate each test, even when multiple API calls write rows.
     with postgres_engine.connect() as connection:
         transaction = connection.begin()
+        try:
+            yield connection
+        finally:
+            transaction.rollback()
 
-        def get_test_session():
-            with Session(
-                connection,
-                autoflush=False,
-                expire_on_commit=False,
-                join_transaction_mode="create_savepoint",
-            ) as session:
-                yield session
 
-        with monkeypatch.context() as patch:
-            patch.setitem(app.dependency_overrides, get_session, get_test_session)
-            patch.setattr("server.main.get_engine", lambda: postgres_engine)
-            try:
-                with TestClient(app) as client:
-                    yield client
-            finally:
-                transaction.rollback()
+@pytest.fixture
+def api(db_connection, postgres_engine, monkeypatch):
+    def get_test_session():
+        with Session(
+            db_connection,
+            autoflush=False,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint",
+        ) as session:
+            yield session
+
+    with monkeypatch.context() as patch:
+        patch.setitem(app.dependency_overrides, get_session, get_test_session)
+        patch.setattr("server.main.get_engine", lambda: postgres_engine)
+        with TestClient(app) as client:
+            yield client

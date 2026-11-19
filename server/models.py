@@ -71,6 +71,18 @@ class User(Base):
         nullable=False
     )
 
+    password_hash: Mapped[str | None] = mapped_column(String(255))
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+
+    token_digest: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
 
 class ProjectMembership(Base):
     __tablename__ = "project_memberships"
