@@ -18,6 +18,52 @@ class ApiClient:
             "http://127.0.0.1:8000"
         ).rstrip("/")
 
+        # Bearer token for the signed in user. Kept in memory only.
+        self.access_token = None
+
+    def _auth_headers(self):
+        if self.access_token is None:
+            return {}
+        return {"Authorization": f"Bearer {self.access_token}"}
+
+    def clear_session(self):
+        self.access_token = None
+
+    def login(self, email, password):
+        with httpx.Client(timeout=5.0) as client:
+            response = client.post(
+                f"{self.base_url}/auth/login",
+                json={"email": email, "password": password}
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        self.access_token = data["access_token"]
+        return data["expires_at"]
+
+    def get_current_user(self):
+        with httpx.Client(timeout=5.0) as client:
+            response = client.get(
+                f"{self.base_url}/auth/me",
+                headers=self._auth_headers()
+            )
+            response.raise_for_status()
+            return response.json()
+
+    def logout(self):
+        if self.access_token is None:
+            return
+
+        try:
+            with httpx.Client(timeout=5.0) as client:
+                response = client.post(
+                    f"{self.base_url}/auth/logout",
+                    headers=self._auth_headers()
+                )
+                response.raise_for_status()
+        finally:
+            self.clear_session()
+
     def _check_endpoint(self, endpoint):
         try:
             with httpx.Client(timeout=3.0) as client:
