@@ -10,7 +10,7 @@ from desktop.pages.project_workspace import ProjectWorkspacePage
 
 import httpx
 from dotenv import load_dotenv
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
@@ -30,9 +30,14 @@ API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 
 
 class MainWindow(QMainWindow):
-    def __init__(self) -> None:
+    # Emitted when the user presses Sign Out
+    signed_out = Signal()
+
+    def __init__(self, api_client=None, current_user=None) -> None:
         super().__init__()
-        self.api_client = ApiClient()
+        self.api_client = api_client or ApiClient()
+        self.current_user = current_user
+        self.sign_out_requested = False
         self.setWindowTitle("Miner Project Hub — Development Starter")
         self.setMinimumSize(620, 360)
 
@@ -78,8 +83,14 @@ class MainWindow(QMainWindow):
         # Create a stack to hold all application pages
         self.pages = QStackedWidget()
 
-        # Keep the existing connection-check screen as the first page
-        self.pages.addWidget(container)
+        # The first page is the Dashboard. Signed in users see their
+        # role's dashboard with the connection check below it.
+        if self.current_user:
+            self.pages.addWidget(
+                self.build_dashboard(self.current_user, container)
+            )
+        else:
+            self.pages.addWidget(container)
 
         # Define the main navigation pages
         page_names = [
@@ -152,6 +163,15 @@ class MainWindow(QMainWindow):
 
         sidebar.addStretch()
 
+        if self.current_user:
+            sign_out_button = QPushButton("Sign Out")
+            sign_out_button.setObjectName("signOut")
+            sign_out_button.clicked.connect(self.sign_out)
+            sidebar.addWidget(sign_out_button)
+            self.setWindowTitle(
+                f"Miner Project Hub - {self.current_user['name']}"
+            )
+
         # Put sidebar and pages next to each other
         main_layout.addLayout(sidebar, 1)
         main_layout.addWidget(self.pages, 4)
@@ -166,7 +186,48 @@ class MainWindow(QMainWindow):
             QPushButton { background-color: #1558b0; color: white; border: 0;
                           border-radius: 6px; padding: 11px 18px; font-weight: 600; }
             QPushButton:hover { background-color: #10468b; }
+            QPushButton#signOut { background-color: #63748c; }
+            QPushButton#signOut:hover { background-color: #4b5a6e; }
         """)
+
+    def build_dashboard(self, user, connection_panel):
+        """Return the dashboard page for the signed in user's role."""
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+
+        if user.get("account_role") == "Professor":
+            title_text = "Professor Dashboard"
+            description = (
+                "Review your students' projects, teams, and submissions."
+            )
+        else:
+            title_text = "Student Dashboard"
+            description = "Your projects and tasks will appear here."
+
+        title = QLabel(title_text)
+        title.setObjectName("heading")
+        page_layout.addWidget(title)
+
+        welcome = QLabel(f"Welcome, {user['name']}")
+        welcome.setObjectName("subtitle")
+        page_layout.addWidget(welcome)
+
+        page_layout.addWidget(QLabel(description))
+        page_layout.addWidget(connection_panel)
+
+        self.dashboard_title = title
+        return page
+
+    def sign_out(self):
+        try:
+            self.api_client.logout()
+        except httpx.HTTPError as exc:
+            # The token is cleared locally even if the server is unreachable
+            print(f"Sign out request failed: {exc}", file=sys.stderr)
+
+        self.sign_out_requested = True
+        self.signed_out.emit()
+        self.close()
 
     
     def check_connection(self):
