@@ -2,6 +2,7 @@
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+from server.routes.auth import router as auth_router
 from server.routes.projects import router as projects_router
 from server.routes.teams import router as teams_router
 from server.routes.users import router as users_router
@@ -15,6 +16,7 @@ app.include_router(projects_router)
 app.include_router(tasks_router)
 app.include_router(teams_router)
 app.include_router(users_router)
+app.include_router(auth_router)
 
 
 @app.get("/health")

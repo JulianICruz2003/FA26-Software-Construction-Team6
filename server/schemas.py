@@ -1,6 +1,6 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator
 
 
 class ProjectCreate(BaseModel):
@@ -79,7 +79,7 @@ class UserRead(BaseModel):
 class UserCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     email: str = Field(min_length=3, max_length=255)
-    account_role: Literal["Student", "Professor"] = "Student"
+    account_role: Literal["Student"] = "Student"
 
     @field_validator("name")
     @classmethod
@@ -89,6 +89,7 @@ class UserCreate(BaseModel):
             raise ValueError("Name cannot be empty")
         return value
 
+
     @field_validator("email")
     @classmethod
     def validate_email(cls, value):
@@ -96,3 +97,35 @@ class UserCreate(BaseModel):
         if value.count("@") != 1 or " " in value:
             raise ValueError("Invalid email address")
         return value
+
+
+class AuthEmail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    email: EmailStr = Field(max_length=255)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.lower()
+
+
+class StudentRegistration(AuthEmail):
+    name: str = Field(min_length=1, max_length=120)
+    password: SecretStr = Field(min_length=15, max_length=128)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        if not (name := value.strip()):
+            raise ValueError("Name cannot be empty")
+        return name
+
+
+class Login(AuthEmail):
+    password: SecretStr = Field(min_length=1, max_length=128)
+
+
+class SessionRead(BaseModel):
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+    expires_at: datetime

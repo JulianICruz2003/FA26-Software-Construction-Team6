@@ -4,7 +4,7 @@
 
 Miner Project Hub is designed as **installable desktop software**, not a website. The PySide6 desktop application talks to a FastAPI backend backed by PostgreSQL. Projects, tasks, user records, and project memberships can already be saved in the development database. Shared deployment across computers is a future goal.
 
-> **Current status (November 2026): Local development prototype.** The desktop app has Projects, Tasks, Team, Overview, and Files interfaces. Project listing/creation, task listing/creation/completion, user record creation/listing, and project membership listing/creation/removal are connected to FastAPI and PostgreSQL. **Files currently list local selections only; they are not uploaded or synchronized.** Login, verified Student/Professor accounts, authorization, course/review workflows, and role-specific dashboards are not implemented. Do not expose the API publicly or use real student records until authentication, authorization, HTTPS, and secure storage are in place.
+> **Current status (November 2026): Local development prototype.** The desktop app has Projects, Tasks, Team, Overview, and Files interfaces. Project listing/creation, task listing/creation/completion, user record creation/listing, and project membership listing/creation/removal are connected to FastAPI and PostgreSQL. **Files currently list local selections only; they are not uploaded or synchronized.** The backend supports email/password authentication. Desktop sign-in, project authorization, course and review workflows, and role-specific dashboards are planned. Keep this prototype local and use development data.
 
 ## Tech stack
 
@@ -12,7 +12,7 @@ Miner Project Hub is designed as **installable desktop software**, not a website
 | --- | --- | --- |
 | Desktop client | Python 3.12, PySide6 (Qt) | Desktop GUI for Windows/macOS/Linux |
 | API client | HTTPX | Communicate with the server |
-| Backend | FastAPI | API endpoints, future authentication and business rules |
+| Backend | FastAPI | API endpoints, authentication, and business rules |
 | Database | PostgreSQL 17 | Shared relational data |
 | ORM and migrations | SQLAlchemy 2, Alembic | Models and schema changes |
 | Database development | Docker Compose | Reproducible local PostgreSQL |
@@ -171,11 +171,11 @@ Press **Check connection**. It should show whether the API and PostgreSQL are re
 | --- | --- |
 | Projects | List and create projects saved in PostgreSQL; double-click to open a workspace |
 | Tasks | List, create, and mark tasks complete for the selected project; saved in PostgreSQL |
-| Team | List, add, and remove project memberships; create development user records; saved in PostgreSQL |
+| Team | List, add, and remove project memberships; create passwordless development Student records; saved in PostgreSQL |
 | Files | Select/remove local files in the UI only; no upload, download, or persistence yet |
 | Overview | Shows the project description, deadline, and team name. Status and summary counts remain placeholders |
 | Diagrams, Activity, Courses, Reviews | Planned or placeholder features |
-| Sign-in and distinct Student/Professor views | **Not yet implemented**; a `Student` or `Professor` field on a user record is not authentication |
+| Sign-in | Available through the authentication API. Desktop sign-in and distinct Student/Professor views are planned. |
 
 ### Current development API routes
 
@@ -184,12 +184,19 @@ Press **Check connection**. It should show whether the API and PostgreSQL are re
 | GET / POST | `/projects` | List or create projects |
 | GET / POST | `/projects/{project_id}/tasks` | List or create tasks for a project |
 | PATCH | `/projects/{project_id}/tasks/{task_id}` | Update task completion |
-| GET / POST | `/users` | List or create development user records |
+| GET / POST | `/users` | List users or create a passwordless development Student record |
 | GET / POST | `/projects/{project_id}/members` | List or add project members |
 | DELETE | `/projects/{project_id}/members/{membership_id}` | Remove project membership |
 | GET | `/health`, `/health/db` | Check API and database connectivity |
+| POST | `/auth/register` | Register a Student with an email and password |
+| POST | `/auth/login` | Exchange credentials for an expiring bearer token |
+| GET | `/auth/me` | Return the bearer token's user |
+| POST | `/auth/logout` | Revoke the bearer session |
 
-These endpoints currently **lack authentication and authorization**. Do not expose the development API to the internet.
+Only `/auth/me` and `/auth/logout` require a bearer token today. Project, task,
+user-directory, and membership access controls are planned. Keep the API on
+loopback. See the [authentication guide](docs/authentication.md) for migration
+and account provisioning.
 
 **Stop development services**
 
@@ -243,7 +250,7 @@ The output goes to `dist/`. Windows builds must be produced on Windows; macOS bu
 
 The `API_BASE_URL` setting in `.env` determines where the desktop app sends requests. `http://127.0.0.1:8000` works only when the server runs on the same computer. For multiple students/professors, deploy the FastAPI server to a trusted host with an HTTPS domain and configure each desktop app to use that URL. Do not expose local PostgreSQL to the internet or simply publish an unauthenticated development server.
 
-For a real deployment, add authentication and authorization, restrict cross-project access, use HTTPS, secure file storage, backup and recovery, and monitoring before handling university data. If using student records, coordinate with university policies and relevant privacy requirements.
+Before shared deployment, require authentication and authorization on business routes, restrict cross-project access, use HTTPS, and add login throttling, secure file storage, backup and recovery, and monitoring. If using student records, coordinate with university policies and relevant privacy requirements.
 
 ## Environment variables
 
@@ -318,8 +325,8 @@ miner-project-hub/
 - [x] Desktop Team Management integration
 - [ ] Full Projects/Tasks CRUD (editing and deleting as appropriate)
 - [ ] Shared file upload, download, storage, and access control
-- [ ] Student and professor registration/sign-in
-- [ ] Server-side authentication and role-based permissions
+- [x] Backend authentication, Student registration, and trusted account provisioning
+- [ ] Desktop sign-in and role-based project permissions
 - [ ] Distinct student and professor dashboards
 - [ ] Courses, reviews, project assignments, diagrams, and activity history
 - [ ] Multi-device synchronization and deployment
