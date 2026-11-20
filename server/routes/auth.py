@@ -2,15 +2,13 @@ from datetime import UTC, datetime
 from secrets import token_urlsafe
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
-from fastapi.routing import APIRoute
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from server.auth import (
+    CredentialRoute,
     PASSWORD_HASHER,
     SESSION_LIFETIME,
     authentication_required,
@@ -21,24 +19,6 @@ from server.auth import (
 from server.database import get_session
 from server.models import AuthSession, User
 from server.schemas import Login, SessionRead, StudentRegistration, UserRead
-
-
-class CredentialRoute(APIRoute):
-    def get_route_handler(self):
-        handler = super().get_route_handler()
-
-        async def handle(request: Request) -> Response:
-            try:
-                return await handler(request)
-            except RequestValidationError as error:
-                # FastAPI's default 422 can echo invalid request inputs.
-                details = [
-                    {key: item[key] for key in ("loc", "type")}
-                    for item in error.errors()
-                ]
-                return JSONResponse({"detail": details}, status_code=422)
-
-        return handle
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"], route_class=CredentialRoute)

@@ -12,9 +12,12 @@ from PySide6.QtWidgets import (
 )
 
 
+from desktop.dialogs.auth_style import AUTH_DIALOG_STYLE
+from desktop.dialogs.registration_dialog import RegistrationDialog, SERVER_UNAVAILABLE
+
+
 INVALID_CREDENTIALS = "Invalid email or password."
 MISSING_FIELDS = "Enter your email and password."
-SERVER_UNAVAILABLE = "Could not reach the server. Make sure the API is running."
 SIGN_IN_FAILED = "Sign in failed. Please try again later."
 
 
@@ -65,22 +68,24 @@ class LoginDialog(QDialog):
         self.sign_in_button.clicked.connect(self.attempt_login)
         layout.addWidget(self.sign_in_button)
 
+        self.create_account_button = QPushButton("Create Account")
+        self.create_account_button.setAutoDefault(False)
+        self.create_account_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.create_account_button.clicked.connect(self.open_registration)
+        layout.addWidget(self.create_account_button)
+
         self.email_input.returnPressed.connect(self.password_input.setFocus)
         self.password_input.returnPressed.connect(self.attempt_login)
 
-        self.setStyleSheet("""
-            QDialog { background-color: #f8fafc; color: #15243a; font-size: 14px; }
-            QLabel { color: #15243a; }
-            QLabel#heading { font-size: 24px; font-weight: 700; }
-            QLabel#subtitle { color: #63748c; }
-            QLabel#error { color: #b42318; }
-            QLineEdit { padding: 7px; border: 1px solid #c5cfdc; border-radius: 5px;
-                        background: white; color: #15243a; }
-            QPushButton { background-color: #1558b0; color: white; border: 0;
-                          border-radius: 6px; padding: 11px 18px; font-weight: 600; }
-            QPushButton:hover { background-color: #10468b; }
-            QPushButton:disabled { background-color: #8aa6cc; }
-        """)
+        self.setStyleSheet(AUTH_DIALOG_STYLE)
+
+    def open_registration(self):
+        dialog = RegistrationDialog(self.api_client, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.email_input.setText(dialog.registered_email)
+            self.password_input.clear()
+            self.error_label.hide()
+            self.password_input.setFocus()
 
     def attempt_login(self):
         email = self.email_input.text().strip()
