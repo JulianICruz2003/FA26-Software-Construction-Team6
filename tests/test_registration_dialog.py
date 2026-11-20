@@ -40,8 +40,8 @@ def assert_checklist(dialog, expected):
         assert label.styleSheet() == ("color: #187044;" if satisfied else "color: #b42318;")
 
 
-def test_password_checklist_updates_with_typing_deleting_and_pasting(qt_app):
-    dialog = RegistrationDialog(Mock())
+def test_password_checklist_updates_with_typing_deleting_and_pasting(qt_app, qt_widget):
+    dialog = qt_widget(RegistrationDialog, Mock())
     password = dialog.password_input
 
     assert_checklist(dialog, (False, False, False))
@@ -70,8 +70,8 @@ def test_password_checklist_updates_with_typing_deleting_and_pasting(qt_app):
         clipboard.clear()
 
 
-def test_confirmation_feedback_updates_from_either_field(qt_app):
-    dialog = RegistrationDialog(Mock())
+def test_confirmation_feedback_updates_from_either_field(qt_app, qt_widget):
+    dialog = qt_widget(RegistrationDialog, Mock())
     feedback = dialog.confirmation_feedback
     dialog.show()
     qt_app.processEvents()
@@ -98,9 +98,9 @@ def test_confirmation_feedback_updates_from_either_field(qt_app):
     dialog.close()
 
 
-def test_maximum_length_is_enforced_separately_from_checklist(qt_app):
+def test_maximum_length_is_enforced_separately_from_checklist(qt_widget):
     client = Mock()
-    dialog = RegistrationDialog(client)
+    dialog = qt_widget(RegistrationDialog, client)
     password = "a" * 127 + "1!"
     fill_form(dialog, password=password, confirmation=password)
 
@@ -122,9 +122,9 @@ def test_maximum_length_is_enforced_separately_from_checklist(qt_app):
     ({"password": "password1"}, PASSWORD_ERROR),
     ({"confirmation": "different123!"}, PASSWORD_MISMATCH),
 ])
-def test_invalid_form_does_not_call_api(qt_app, fields, message):
+def test_invalid_form_does_not_call_api(qt_widget, fields, message):
     client = Mock()
-    dialog = RegistrationDialog(client)
+    dialog = qt_widget(RegistrationDialog, client)
     fill_form(dialog, **fields)
     dialog.create_account_button.click()
     client.register.assert_not_called()
@@ -132,9 +132,9 @@ def test_invalid_form_does_not_call_api(qt_app, fields, message):
 
 
 @pytest.mark.parametrize("submit", [False, True], ids=["cancel", "create"])
-def test_create_account_opens_dialog_and_returns_to_sign_in(qt_app, monkeypatch, submit):
+def test_create_account_opens_dialog_and_returns_to_sign_in(qt_app, qt_widget, monkeypatch, submit):
     client = Mock()
-    login = LoginDialog(client)
+    login = qt_widget(LoginDialog, client)
     success = Mock()
     monkeypatch.setattr(QMessageBox, "information", success)
     login.show()
@@ -155,7 +155,7 @@ def test_create_account_opens_dialog_and_returns_to_sign_in(qt_app, monkeypatch,
         else:
             dialog.back_button.click()
 
-    QTimer.singleShot(0, interact)
+    QTimer.singleShot(0, login, interact)
     login.create_account_button.click()
 
     assert observed == [(True, QLineEdit.EchoMode.Password, QLineEdit.EchoMode.Password)]
@@ -180,7 +180,7 @@ def test_create_account_opens_dialog_and_returns_to_sign_in(qt_app, monkeypatch,
     (422, "password", PASSWORD_ERROR),
     (500, None, REGISTRATION_FAILED),
 ])
-def test_server_failure_shows_safe_message(qt_app, status, field, message):
+def test_server_failure_shows_safe_message(qt_widget, status, field, message):
     client = Mock()
     request = httpx.Request("POST", "http://test/auth/register")
     if status is None:
@@ -192,7 +192,7 @@ def test_server_failure_shows_safe_message(qt_app, status, field, message):
         client.register.side_effect = httpx.HTTPStatusError(
             "request failed", request=request, response=response,
         )
-    dialog = RegistrationDialog(client)
+    dialog = qt_widget(RegistrationDialog, client)
     fill_form(dialog)
     dialog.create_account_button.click()
     assert dialog.error_label.text() == message

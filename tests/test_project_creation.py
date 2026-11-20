@@ -41,7 +41,7 @@ def project_api():
         engine.dispose()
 
 
-def test_desktop_submits_and_displays_all_project_fields(qt_app, monkeypatch):
+def test_desktop_submits_and_displays_all_project_fields(qt_widget, monkeypatch):
     monkeypatch.setenv("API_BASE_URL", "http://testserver")
     deadline = QDate.currentDate().addDays(14)
     projects = []
@@ -76,12 +76,12 @@ def test_desktop_submits_and_displays_all_project_fields(qt_app, monkeypatch):
         SimpleNamespace(Client=lambda **kwargs: httpx.Client(transport=transport, **kwargs)),
     )
 
-    page = ProjectsPage(api_client.ApiClient())
+    page = qt_widget(ProjectsPage, api_client.ApiClient())
     page.create_button.click()
 
     assert projects == [{"id": 1, **expected}]
     assert page.project_list.count() == 1
-    overview = OverviewTab()
+    overview = qt_widget(OverviewTab)
     page.project_opened.connect(overview.set_project)
     page.open_selected_project(page.project_list.item(0))
     assert overview.description.text() == expected["description"]
