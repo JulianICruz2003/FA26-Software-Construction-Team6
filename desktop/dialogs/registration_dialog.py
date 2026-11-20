@@ -17,16 +17,31 @@ from shared.registration import (
     EMAIL_DOMAIN_ERROR,
     PASSWORD_ERROR,
     normalize_university_email,
+    password_requirement_status,
     validate_new_password,
 )
 
 
 MISSING_FIELDS = "Complete all four fields."
-PASSWORD_MISMATCH = "Passwords do not match."
+CONFIRMATION_MISMATCH = "Passwords do not match"
+PASSWORD_MISMATCH = f"{CONFIRMATION_MISMATCH}."
 NAME_ERROR = "Enter a full name of 120 characters or fewer."
 DUPLICATE_EMAIL = "An account with this email already exists."
 SERVER_UNAVAILABLE = "Could not reach the server. Make sure the API is running."
 REGISTRATION_FAILED = "Account creation failed. Please try again later."
+
+
+PASSWORD_REQUIREMENTS = (
+    "At least 8 characters",
+    "At least one number",
+    "At least one special character",
+)
+
+
+def set_validation_feedback(label, message, satisfied):
+    icon, color = ("✓", "#187044") if satisfied else ("✕", "#b42318")
+    label.setText(f"{icon}  {message}")
+    label.setStyleSheet(f"color: {color};")
 
 
 class RegistrationDialog(QDialog):
@@ -56,13 +71,25 @@ class RegistrationDialog(QDialog):
         form.addRow("&Full Name:", self.name_input)
         form.addRow("&University Email:", self.email_input)
         form.addRow("&Password:", self.password_input)
+        checklist = QVBoxLayout()
+        checklist.setSpacing(3)
+        self.password_requirement_labels = [QLabel() for _ in PASSWORD_REQUIREMENTS]
+        for label in self.password_requirement_labels:
+            checklist.addWidget(label)
+        form.addRow("", checklist)
+
         form.addRow("C&onfirm Password:", self.confirm_password_input)
+        self.confirmation_feedback = QLabel()
+        # Reserve a line for feedback so the fields and buttons stay in place.
+        self.confirmation_feedback.setMinimumHeight(self.confirmation_feedback.fontMetrics().height())
+        form.addRow("", self.confirmation_feedback)
         layout.addLayout(form)
 
-        hint = QLabel(PASSWORD_ERROR)
-        hint.setObjectName("subtitle")
-        hint.setWordWrap(True)
-        layout.addWidget(hint)
+        self.password_input.textChanged.connect(self.update_password_requirements)
+        self.password_input.textChanged.connect(self.update_confirmation_feedback)
+        self.confirm_password_input.textChanged.connect(self.update_confirmation_feedback)
+        self.update_password_requirements()
+        self.update_confirmation_feedback()
 
         self.error_label = QLabel()
         self.error_label.setObjectName("error")
@@ -82,6 +109,22 @@ class RegistrationDialog(QDialog):
         self.back_button.clicked.connect(self.reject)
         layout.addWidget(self.back_button)
         self.name_input.setFocus()
+
+    def update_password_requirements(self):
+        statuses = password_requirement_status(self.password_input.text())
+        for label, message, satisfied in zip(
+            self.password_requirement_labels, PASSWORD_REQUIREMENTS, statuses, strict=True
+        ):
+            set_validation_feedback(label, message, satisfied)
+
+    def update_confirmation_feedback(self):
+        confirmation = self.confirm_password_input.text()
+        if not confirmation:
+            self.confirmation_feedback.clear()
+            return
+        matches = confirmation == self.password_input.text()
+        message = "Passwords match" if matches else CONFIRMATION_MISMATCH
+        set_validation_feedback(self.confirmation_feedback, message, matches)
 
     def attempt_registration(self):
         name = self.name_input.text().strip()

@@ -3,7 +3,8 @@ from unittest.mock import Mock
 
 import httpx
 import pytest
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QDialog, QLineEdit, QMessageBox
 
 from desktop.dialogs.login_dialog import LoginDialog
@@ -30,6 +31,86 @@ def fill_form(dialog, *, name="Test Student", email=EMAIL, password=PASSWORD, co
     dialog.confirm_password_input.setText(confirmation)
 
 
+def assert_checklist(dialog, expected):
+    labels = dialog.password_requirement_labels
+    messages = ("At least 8 characters", "At least one number", "At least one special character")
+    assert len(labels) == len(messages)
+    for label, message, satisfied in zip(labels, messages, expected, strict=True):
+        assert label.text() == f"{'✓' if satisfied else '✕'}  {message}"
+        assert label.styleSheet() == ("color: #187044;" if satisfied else "color: #b42318;")
+
+
+def test_password_checklist_updates_with_typing_deleting_and_pasting(qt_app):
+    dialog = RegistrationDialog(Mock())
+    password = dialog.password_input
+
+    assert_checklist(dialog, (False, False, False))
+    QTest.keyClicks(password, "password")
+    assert_checklist(dialog, (True, False, False))
+    QTest.keyClicks(password, "1")
+    assert_checklist(dialog, (True, True, False))
+    QTest.keyClicks(password, "!")
+    assert_checklist(dialog, (True, True, True))
+
+    QTest.keyClick(password, Qt.Key.Key_Backspace)
+    assert_checklist(dialog, (True, True, False))
+    QTest.keyClick(password, Qt.Key.Key_Backspace)
+    assert_checklist(dialog, (True, False, False))
+    QTest.keyClick(password, Qt.Key.Key_Backspace)
+    assert_checklist(dialog, (False, False, False))
+
+    clipboard = qt_app.clipboard()
+    try:
+        clipboard.setText(PASSWORD)
+        password.selectAll()
+        password.paste()
+        assert_checklist(dialog, (True, True, True))
+        assert dialog.confirmation_feedback.text() == ""
+    finally:
+        clipboard.clear()
+
+
+def test_confirmation_feedback_updates_from_either_field(qt_app):
+    dialog = RegistrationDialog(Mock())
+    feedback = dialog.confirmation_feedback
+    dialog.show()
+    qt_app.processEvents()
+    button_position = dialog.create_account_button.pos()
+
+    assert dialog.password_input.x() == dialog.password_requirement_labels[0].x()
+    assert dialog.confirm_password_input.x() == feedback.x()
+    assert feedback.text() == ""
+    dialog.password_input.setText(PASSWORD)
+    dialog.confirm_password_input.setText("different123!")
+    assert feedback.text() == "✕  Passwords do not match"
+    assert feedback.styleSheet() == "color: #b42318;"
+
+    dialog.confirm_password_input.setText(PASSWORD)
+    assert feedback.text() == "✓  Passwords match"
+    assert feedback.styleSheet() == "color: #187044;"
+    qt_app.processEvents()
+    assert dialog.create_account_button.pos() == button_position
+
+    dialog.password_input.setText("different123!")
+    assert feedback.text() == "✕  Passwords do not match"
+    dialog.confirm_password_input.clear()
+    assert feedback.text() == ""
+    dialog.close()
+
+
+def test_maximum_length_is_enforced_separately_from_checklist(qt_app):
+    client = Mock()
+    dialog = RegistrationDialog(client)
+    password = "a" * 127 + "1!"
+    fill_form(dialog, password=password, confirmation=password)
+
+    assert_checklist(dialog, (True, True, True))
+    dialog.create_account_button.click()
+    client.register.assert_not_called()
+    assert dialog.error_label.text() == PASSWORD_ERROR
+    assert_checklist(dialog, (True, True, True))
+
+
 @pytest.mark.parametrize(("fields", "message"), [
     ({"name": " "}, MISSING_FIELDS),
     ({"email": ""}, MISSING_FIELDS),
@@ -37,7 +118,6 @@ def fill_form(dialog, *, name="Test Student", email=EMAIL, password=PASSWORD, co
     ({"confirmation": ""}, MISSING_FIELDS),
     ({"email": "student@miners.utep.edu.fake.com"}, EMAIL_DOMAIN_ERROR),
     ({"password": "test1!"}, PASSWORD_ERROR),
-    ({"password": "a" * 127 + "1!"}, PASSWORD_ERROR),
     ({"password": "password!"}, PASSWORD_ERROR),
     ({"password": "password1"}, PASSWORD_ERROR),
     ({"confirmation": "different123!"}, PASSWORD_MISMATCH),
