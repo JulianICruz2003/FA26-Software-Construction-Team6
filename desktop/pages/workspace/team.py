@@ -21,6 +21,9 @@ from PySide6.QtWidgets import (
 )
 
 
+from shared.registration import normalize_university_email
+
+
 class TeamTab(QWidget):
     def __init__(self, api_client):
         super().__init__()
@@ -250,13 +253,7 @@ class TeamTab(QWidget):
         name_input.setPlaceholderText("Full name")
 
         email_input = QLineEdit()
-        email_input.setPlaceholderText("Email address")
-
-        account_role_input = QComboBox()
-        account_role_input.addItems([
-            "Student",
-            "Professor"
-        ])
+        email_input.setPlaceholderText("you@miners.utep.edu")
 
         project_role_input = QComboBox()
         project_role_input.addItems([
@@ -266,8 +263,8 @@ class TeamTab(QWidget):
         ])
 
         form.addRow("Name:", name_input)
-        form.addRow("Email:", email_input)
-        form.addRow("Account Type:", account_role_input)
+        form.addRow("University Email:", email_input)
+        form.addRow("Account Type:", QLabel("Student"))
         form.addRow("Project Role:", project_role_input)
 
         buttons = QDialogButtonBox(
@@ -278,21 +275,16 @@ class TeamTab(QWidget):
         form.addRow(buttons)
 
         def validate():
-            name = name_input.text().strip()
-            email = email_input.text().strip()
-
-            if (
-                not name
-                or email.count("@") != 1
-                or " " in email
-            ):
-                QMessageBox.warning(
-                    dialog,
-                    "Invalid Information",
-                    "Enter a name and a valid email address."
-                )
+            if not name_input.text().strip():
+                QMessageBox.warning(dialog, "Invalid Information", "Enter a full name.")
+                return
+            try:
+                email = normalize_university_email(email_input.text())
+            except ValueError as error:
+                QMessageBox.warning(dialog, "Invalid Information", str(error))
                 return
 
+            email_input.setText(email)
             dialog.accept()
 
         buttons.accepted.connect(validate)
@@ -304,8 +296,8 @@ class TeamTab(QWidget):
         try:
             user = self.api_client.create_user(
                 name_input.text().strip(),
-                email_input.text().strip().lower(),
-                account_role_input.currentText()
+                email_input.text(),
+                "Student"
             )
 
         except httpx.HTTPStatusError as error:

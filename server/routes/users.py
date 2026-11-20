@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from server.auth import CredentialRoute
 from server.database import get_session
 from server.models import User
 from server.schemas import UserCreate, UserRead
@@ -10,7 +11,8 @@ from server.schemas import UserCreate, UserRead
 
 router = APIRouter(
     prefix="/users",
-    tags=["Users"]
+    tags=["Users"],
+    route_class=CredentialRoute
 )
 
 

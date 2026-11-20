@@ -12,7 +12,7 @@ from desktop.pages.project_workspace import ProjectWorkspacePage
     ids=["connection-failure", "invalid-response"],
 )
 def test_failed_project_switch_clears_tasks_and_retry_loads_current_project(
-    qt_app, load_error
+    qt_widget, load_error
 ):
     api_client = Mock()
     api_client.get_team_members.return_value = []
@@ -22,7 +22,7 @@ def test_failed_project_switch_clears_tasks_and_retry_loads_current_project(
         [{"id": 20, "title": "Second project task", "is_complete": False}],
         [{"id": 20, "title": "Second project task", "is_complete": True}],
     ]
-    workspace = ProjectWorkspacePage(api_client)
+    workspace = qt_widget(ProjectWorkspacePage, api_client)
     tasks = workspace.tasks_tab
 
     workspace.display_project({"id": 1, "name": "First project"})

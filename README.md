@@ -4,7 +4,7 @@
 
 Miner Project Hub is designed as **installable desktop software**, not a website. The PySide6 desktop application talks to a FastAPI backend backed by PostgreSQL. Projects, tasks, user records, and project memberships can already be saved in the development database. Shared deployment across computers is a future goal.
 
-> **Current status (November 2026): Local development prototype.** The desktop app has Projects, Tasks, Team, Overview, and Files interfaces. Project listing/creation, task listing/creation/completion, user record creation/listing, and project membership listing/creation/removal are connected to FastAPI and PostgreSQL. **Files currently list local selections only; they are not uploaded or synchronized.** The backend supports email/password authentication. Desktop sign-in, project authorization, course and review workflows, and role-specific dashboards are planned. Keep this prototype local and use development data.
+> **Current status (November 2026): Local development prototype.** The desktop app has Projects, Tasks, Team, Overview, and Files interfaces. Project listing/creation, task listing/creation/completion, user record creation/listing, and project membership listing/creation/removal are connected to FastAPI and PostgreSQL. **Files currently list local selections only; they are not uploaded or synchronized.** The desktop app supports Student registration and sign-in to Student and Professor dashboards. Project authorization and course and review workflows are planned. Keep this prototype local and use development data.
 
 ## Tech stack
 
@@ -163,7 +163,24 @@ The local API listens on `http://127.0.0.1:8000` by default. If port 8000 is alr
 python -m desktop.main
 ```
 
-Press **Check connection**. It should show whether the API and PostgreSQL are responding. This is a real Qt desktop window, not a browser page.
+### Register and sign in
+
+1. On the Sign In window, select **Create Account**.
+2. Enter your full name and an email ending in `@miners.utep.edu` or `@utep.edu`. Email addresses are stored in lowercase.
+3. Enter and confirm a password with 8–128 characters, at least one number, and at least one special character. Uppercase and lowercase letters are optional.
+4. Select **Create Account** and acknowledge the success message. Sign in with the new account to open the Student Dashboard.
+
+The desktop sends registration over HTTPX to FastAPI at `POST /auth/register`.
+FastAPI validates credentials, assigns the Student role, and stores a salted
+Argon2id password hash in PostgreSQL. Existing users can sign in with their
+current credentials. A trusted server administrator provisions Professor accounts.
+See the [authentication guide](docs/authentication.md) for provisioning and
+session details.
+
+To test locally, register with an unused university address in your development
+database, sign in, and use **Sign Out**. Try creating the same account again
+to confirm that the duplicate is rejected. Email ownership verification and
+project authorization are still pending.
 
 ### Features currently available in local development
 
@@ -175,7 +192,7 @@ Press **Check connection**. It should show whether the API and PostgreSQL are re
 | Files | Select/remove local files in the UI only; no upload, download, or persistence yet |
 | Overview | Shows the project description, deadline, and team name. Status and summary counts remain placeholders |
 | Diagrams, Activity, Courses, Reviews | Planned or placeholder features |
-| Sign-in | Available through the authentication API. Desktop sign-in and distinct Student/Professor views are planned. |
+| Accounts | Desktop Student registration, sign-in and sign-out, and Student and Professor dashboards |
 
 ### Current development API routes
 
@@ -184,7 +201,7 @@ Press **Check connection**. It should show whether the API and PostgreSQL are re
 | GET / POST | `/projects` | List or create projects |
 | GET / POST | `/projects/{project_id}/tasks` | List or create tasks for a project |
 | PATCH | `/projects/{project_id}/tasks/{task_id}` | Update task completion |
-| GET / POST | `/users` | List users or create a passwordless development Student record |
+| GET / POST | `/users` | List users or create a passwordless development Student record with a university email |
 | GET / POST | `/projects/{project_id}/members` | List or add project members |
 | DELETE | `/projects/{project_id}/members/{membership_id}` | Remove project membership |
 | GET | `/health`, `/health/db` | Check API and database connectivity |
@@ -326,8 +343,8 @@ miner-project-hub/
 - [ ] Full Projects/Tasks CRUD (editing and deleting as appropriate)
 - [ ] Shared file upload, download, storage, and access control
 - [x] Backend authentication, Student registration, and trusted account provisioning
-- [ ] Desktop sign-in and role-based project permissions
-- [ ] Distinct student and professor dashboards
+- [x] Desktop Student registration, sign-in, and role-based dashboards
+- [ ] Email ownership verification and role-based project permissions
 - [ ] Courses, reviews, project assignments, diagrams, and activity history
 - [ ] Multi-device synchronization and deployment
 - [ ] Packaging, backup/restore, security review, and final documentation

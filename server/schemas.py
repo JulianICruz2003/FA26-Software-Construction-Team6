@@ -1,6 +1,9 @@
 from datetime import date, datetime
 from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator
+
+from shared.registration import normalize_university_email, validate_new_password
 
 
 class ProjectCreate(BaseModel):
@@ -76,27 +79,27 @@ class UserRead(BaseModel):
     email: str
     account_role: str
 
-class UserCreate(BaseModel):
+
+class NewAccount(BaseModel):
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
     name: str = Field(min_length=1, max_length=120)
-    email: str = Field(min_length=3, max_length=255)
-    account_role: Literal["Student"] = "Student"
+    email: str = Field(max_length=255)
 
     @field_validator("name")
     @classmethod
-    def validate_name(cls, value):
-        value = value.strip()
-        if not value:
+    def validate_name(cls, value: str) -> str:
+        if not (name := value.strip()):
             raise ValueError("Name cannot be empty")
-        return value
-
+        return name
 
     @field_validator("email")
     @classmethod
-    def validate_email(cls, value):
-        value = value.strip().lower()
-        if value.count("@") != 1 or " " in value:
-            raise ValueError("Invalid email address")
-        return value
+    def validate_email(cls, value: str) -> str:
+        return normalize_university_email(value)
+
+
+class UserCreate(NewAccount):
+    account_role: Literal["Student"] = "Student"
 
 
 class AuthEmail(BaseModel):
@@ -109,16 +112,14 @@ class AuthEmail(BaseModel):
         return value.lower()
 
 
-class StudentRegistration(AuthEmail):
-    name: str = Field(min_length=1, max_length=120)
-    password: SecretStr = Field(min_length=15, max_length=128)
+class StudentRegistration(NewAccount):
+    password: SecretStr = Field(min_length=8, max_length=128)
 
-    @field_validator("name")
+    @field_validator("password")
     @classmethod
-    def validate_name(cls, value: str) -> str:
-        if not (name := value.strip()):
-            raise ValueError("Name cannot be empty")
-        return name
+    def validate_password(cls, value: SecretStr) -> SecretStr:
+        validate_new_password(value.get_secret_value())
+        return value
 
 
 class Login(AuthEmail):
