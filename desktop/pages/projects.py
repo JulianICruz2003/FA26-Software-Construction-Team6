@@ -29,16 +29,24 @@ class ProjectsPage(QWidget):
 
     project_opened = Signal(dict)
 
-    def __init__(self, api_client):
+    def __init__(self, api_client, *, load_on_init=True):
         super().__init__()
         self.api_client = api_client
+        self.has_loaded = False
 
         layout = QVBoxLayout(self)
 
         # Page heading
-        title = QLabel("My Projects")
+        title = QLabel("Shared Projects")
         title.setObjectName("heading")
         layout.addWidget(title)
+
+        description = QLabel(
+            "The current project list is shared across accounts. "
+            "New projects created here are standalone."
+        )
+        description.setWordWrap(True)
+        layout.addWidget(description)
 
         # Toolbar
         toolbar = QHBoxLayout()
@@ -51,9 +59,17 @@ class ProjectsPage(QWidget):
         toolbar.addWidget(self.search)
         toolbar.addWidget(self.create_button)
 
+        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.clicked.connect(self.load_projects)
+        toolbar.addWidget(self.refresh_button)
+
         layout.addLayout(toolbar)
 
-        # Sample projects
+        self.load_status = QLabel("Project list has not loaded yet.")
+        self.load_status.setWordWrap(True)
+        layout.addWidget(self.load_status)
+
+        # Project list
         self.project_list = QListWidget()
 
         layout.addWidget(self.project_list)
@@ -68,7 +84,8 @@ class ProjectsPage(QWidget):
         )
 
         # Load projects from PostgreSQL
-        self.load_projects()
+        if load_on_init:
+            self.load_projects()
 
     def filter_projects(self, text):
         for row in range(self.project_list.count()):
@@ -81,15 +98,15 @@ class ProjectsPage(QWidget):
         try:
             projects = self.api_client.get_projects()
 
-        except (httpx.HTTPError, ValueError) as error:
-            QMessageBox.warning(
-                self,
-                "Connection Error",
-                f"Could not load projects:\n{error}"
-            )
+        except (httpx.HTTPError, ValueError):
+            self.load_status.setText("Could not load shared projects. Select Refresh to retry.")
+            self.load_status.show()
             return
 
+        self.has_loaded = True
         self.project_list.clear()
+        self.load_status.setText("No shared projects yet.")
+        self.load_status.setVisible(not projects)
 
         for project in projects:
             item = QListWidgetItem(project["name"])

@@ -192,7 +192,7 @@ project authorization are still pending.
 | Files | Select/remove local files in the UI only; no upload, download, or persistence yet |
 | Overview | Shows the project description, deadline, and team name. Status and summary counts remain placeholders |
 | Diagrams, Activity, Courses, Reviews | Planned or placeholder features |
-| Accounts | Desktop Student registration, sign-in and sign-out, and Student and Professor dashboards |
+| Accounts | Desktop Student registration, sign-in and sign-out, and [Student and Professor dashboards](docs/dashboards.md) |
 
 ### Current development API routes
 
