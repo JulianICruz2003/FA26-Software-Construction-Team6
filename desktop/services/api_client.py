@@ -29,6 +29,14 @@ class ApiClient:
     def clear_session(self):
         self.access_token = None
 
+    def register(self, name, email, password):
+        with httpx.Client(timeout=5.0) as client:
+            response = client.post(
+                f"{self.base_url}/auth/register",
+                json={"name": name, "email": email, "password": password},
+            )
+            response.raise_for_status()
+
     def login(self, email, password):
         with httpx.Client(timeout=5.0) as client:
             response = client.post(

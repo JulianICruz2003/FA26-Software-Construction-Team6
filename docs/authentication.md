@@ -1,51 +1,59 @@
-# Backend authentication
+# Account registration and authentication
 
-The authentication API uses email and password credentials. The current desktop
-app does not send credentials. Project, task, user-directory, and membership
-routes remain open for local development until the authorization work lands.
+## Register from the desktop
 
-## Migration and existing accounts
+Follow the [local setup instructions](../README.md#run-locally-macos-linux-or-windows)
+to start PostgreSQL, apply Alembic migrations, and launch FastAPI. Run
+`python -m desktop.main` from the repository root.
 
-Update the server's Python dependencies, then apply migrations to the intended
-database before starting the updated API.
+1. Select **Create Account** on the Sign In window.
+2. Enter your full name and a valid address at exactly `@miners.utep.edu` or
+   `@utep.edu`. Domain matching is case insensitive. The API stores email
+   addresses in lowercase.
+3. Enter and confirm a password of 8–128 characters with at least one number
+   and one punctuation character or symbol. Letters of either case are optional.
+4. Submit the form, acknowledge the confirmation, and sign in with your new
+   credentials to open the Student Dashboard.
+
+The PySide6 dialog masks both password fields and checks the form before HTTPX
+sends the name, email, and password to `POST /auth/register` on `API_BASE_URL`.
+FastAPI validates the request again. Public registration always creates a Student
+and returns a profile. Sign-in creates the bearer session in a separate request.
+
+To test with a local development database, register with an unused university
+address, sign in, and sign out. Repeat with the same email to check duplicate
+handling. Try another domain and a nonmatching confirmation to check the form
+errors. Run `python -m pytest -q` for automated tests. With Docker running,
+`RUN_POSTGRES_TESTS=1 python -m pytest -q` includes integration tests in a
+disposable PostgreSQL container.
+
+## Existing accounts and administrator provisioning
+
+Registration uses the existing schema. Revision `6c7ab719eb23` introduced
+`users.password_hash` and `auth_sessions`. Existing records and memberships
+are preserved. Accounts with credentials can still sign in using their
+existing email and password. Passwordless records cannot sign in, and
+self-registration with an existing email cannot take over the record.
+
+A trusted administrator with access to the server terminal and database can
+create a Professor account or activate a passwordless record. Verify the
+account owner's identity and intended role before provisioning. Treat legacy
+Professor labels as unverified because the old development API allowed clients
+to set them.
 
 ```bash
-python -m pip install -r requirements/server.txt
-python -m alembic upgrade head
+python -m server.provision_account --email professor@utep.edu --role Professor --name "Professor Name"
+python -m server.provision_account --email student@miners.utep.edu --role Student
 ```
 
-Revision `6c7ab719eb23` adds a nullable `users.password_hash` column and a new
-`auth_sessions` table. Existing users, projects, tasks, and memberships remain
-in place. Existing users start without credentials. They cannot log in, and
-self-registration with an existing email cannot take over the account.
+The command prompts twice with hidden input, enforces the university email and
+new password rules, and refuses to replace existing credentials. Activation
+preserves user IDs and memberships and requires an eligible university address.
+Use the intended role explicitly. The legacy `POST /users` route creates only
+passwordless Student records with a university email so Team management can
+continue to create development records.
 
-A trusted administrator with access to the server terminal and its database
-configuration can create a Professor or activate a passwordless account. Verify
-the account owner's identity and intended role before provisioning. In
-particular, a legacy `Professor` label was previously assignable through the
-development API and is insufficient evidence of approval.
-
-```bash
-# Create a Professor account.
-python -m server.provision_account --email professor@example.com --role Professor --name "Professor Name"
-
-# Activate an existing, verified account in place.
-python -m server.provision_account --email student@example.com --role Student
-```
-
-Use the intended role explicitly when activating a verified legacy Professor.
-The command prompts twice with hidden input and refuses to replace existing
-credentials. Use a unique password chosen by the account owner through a
-trusted process. The command preserves existing user IDs and memberships.
-Legacy addresses must be valid for sign-in. Resolve invalid addresses with the
-administrator before activation. The migration downgrade removes password hashes
-and session rows, so it would discard accounts' credentials and sessions.
-
-The legacy `POST /users` route creates only passwordless Student records. The
-current desktop team dialog may still show a Professor option. The API rejects
-that selection, and Professor accounts must be provisioned from the server.
-
-## Endpoints
+## Endpoints and credential storage
 
 | Method and path | Request and response |
 | --- | --- |
@@ -54,19 +62,19 @@ that selection, and Professor accounts must be provisioned from the server.
 | `GET /auth/me` | Accepts `Authorization: Bearer <token>` and returns the profile. |
 | `POST /auth/logout` | Accepts the same authorization header, revokes that session, and returns 204. Other sessions remain active. |
 
-Emails are validated and normalized for lookup. New passwords must contain 15
-to 128 characters. Passwords are stored using salted Argon2id hashes. The API
-can rehash an existing password on successful login when hashing parameters
-change. Validation errors on authentication routes omit submitted values.
+Passwords are stored as salted Argon2id hashes. The API can rehash an existing
+password on successful login when hashing parameters change. Validation errors
+on authentication and account-creation routes omit submitted input values.
 
 Each login generates an opaque token from 32 bytes of randomness. PostgreSQL
-stores only its SHA-256 digest, the user ID, and a fixed 12-hour expiration.
-Logout removes the session row. Expired tokens cannot authenticate. There is
-no refresh-token flow. The desktop login work can send the bearer token in
-the authorization header and prompt for sign-in again on expiry. Avoid logging
-tokens or sending them in URLs.
+stores only its SHA-256 digest, user ID, and fixed 12-hour expiration. The
+desktop holds the bearer token in memory. Logout removes the session row.
+Expired tokens cannot authenticate. A user signs in again to start a new session.
 
-Use HTTPS for credentials and bearer tokens outside loopback. Before shared
-deployment, enforce authentication and project permissions on business routes
-and add login throttling and expired-session cleanup. Student self-registration
-does not verify ownership of an email address.
+## Shared deployment limitations
+
+The email domain check establishes address eligibility. Verification of email
+ownership remains future work. Project, task, user-directory, and membership
+routes are open in the local development prototype. Enforce authentication and
+project permissions before shared deployment. Use HTTPS outside loopback and
+add login throttling and expired-session cleanup.

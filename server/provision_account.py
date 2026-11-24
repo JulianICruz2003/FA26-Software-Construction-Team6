@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 from server.auth import PASSWORD_HASHER
 from server.database import get_engine
 from server.models import User
-from server.schemas import AuthEmail, StudentRegistration
+from server.schemas import StudentRegistration
+from shared.registration import PASSWORD_ERROR, normalize_university_email
 
 
 def provision_account(
@@ -24,7 +25,7 @@ def provision_account(
     role: Literal["Student", "Professor"],
     name: str | None,
 ) -> None:
-    email = AuthEmail(email=email).email
+    email = normalize_university_email(email)
     user = db.scalar(select(User).where(User.email == email).with_for_update())
     if user is not None and user.password_hash is not None:
         raise ValueError("The account already has credentials")
@@ -52,7 +53,8 @@ def main() -> None:
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", GetPassWarning)
-            password = getpass("Password (15–128 characters): ")
+            print(PASSWORD_ERROR)
+            password = getpass("Password: ")
             confirmation = getpass("Confirm password: ")
     except (GetPassWarning, EOFError):
         parser.exit(1, "A terminal with hidden password input is required.\n")
@@ -65,7 +67,7 @@ def main() -> None:
                 db, email=args.email, password=password, role=args.role, name=args.name
             )
     except ValidationError:
-        parser.exit(1, "Provide a valid email, name, and password of 15–128 characters.\n")
+        parser.exit(1, f"Provide a valid name and password. {PASSWORD_ERROR}\n")
     except ValueError as error:
         parser.exit(1, f"{error}\n")
     except IntegrityError:

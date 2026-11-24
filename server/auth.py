@@ -8,7 +8,10 @@ from typing import Annotated
 
 from argon2 import PasswordHasher, Type
 from argon2.exceptions import InvalidHashError, VerificationError
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request, Response
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -21,6 +24,24 @@ PASSWORD_HASHER = PasswordHasher(type=Type.ID)
 DUMMY_HASH = PASSWORD_HASHER.hash(token_urlsafe(32))
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{43}")
 bearer_scheme = HTTPBearer(auto_error=False)
+
+
+class CredentialRoute(APIRoute):
+    def get_route_handler(self):
+        handler = super().get_route_handler()
+
+        async def handle(request: Request) -> Response:
+            try:
+                return await handler(request)
+            except RequestValidationError as error:
+                # FastAPI's default 422 can echo invalid request inputs.
+                details = [
+                    {key: item[key] for key in ("loc", "type")}
+                    for item in error.errors()
+                ]
+                return JSONResponse({"detail": details}, status_code=422)
+
+        return handle
 
 
 def verify_password(password: str, stored_hash: str | None) -> bool:

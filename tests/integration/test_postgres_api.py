@@ -101,13 +101,13 @@ def test_tasks_are_project_scoped_and_completion_is_reversible(api):
 
 
 def test_users_normalize_email_and_reject_duplicates(api):
-    user = created(api, "/users", name="  Example User  ", email=" Student@Example.com ")
+    user = created(api, "/users", name="  Example User  ", email=" Student@Miners.UTEP.edu ")
     assert user == {
         "id": user["id"], "name": "Example User",
-        "email": "student@example.com", "account_role": "Student",
+        "email": "student@miners.utep.edu", "account_role": "Student",
     }
     response = api.post(
-        "/users", json={"name": "Duplicate", "email": "STUDENT@example.com"}
+        "/users", json={"name": "Duplicate", "email": "STUDENT@miners.utep.edu"}
     )
     assert response.status_code == 409
     assert api.get("/users").json() == [user]
@@ -116,7 +116,7 @@ def test_users_normalize_email_and_reject_duplicates(api):
 def test_membership_add_list_duplicate_and_remove(api):
     project = created(api, "/projects", name="First")
     other = created(api, "/projects", name="Second")
-    user = created(api, "/users", name="Student", email="student@example.com")
+    user = created(api, "/users", name="Student", email="student@miners.utep.edu")
     members = f"/projects/{project['id']}/members"
     other_members = f"/projects/{other['id']}/members"
     assignment = {"user_id": user["id"], "project_role": "Team Lead"}
@@ -142,7 +142,7 @@ def test_membership_add_list_duplicate_and_remove(api):
         ("POST", "/projects/-1/tasks", {"title": " "}, 422),
         ("PATCH", "/projects/-1/tasks/-1", {"is_complete": "invalid"}, 422),
         ("POST", "/users", {"name": "Student", "email": "invalid"}, 422),
-        ("POST", "/users", {"name": "Student", "email": "s@example.com", "account_role": "Invalid"}, 422),
+        ("POST", "/users", {"name": "Student", "email": "s@utep.edu", "account_role": "Invalid"}, 422),
         ("POST", "/projects/-1/members", {"user_id": 0}, 422),
         ("POST", "/projects/-1/members", {"user_id": 1, "project_role": "Invalid"}, 422),
         ("GET", "/projects/-1/tasks", None, 404),

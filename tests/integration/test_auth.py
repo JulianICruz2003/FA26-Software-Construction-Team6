@@ -6,13 +6,14 @@ import pytest
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from server.auth import PASSWORD_HASHER
 from server.models import AuthSession, User
 from server.provision_account import provision_account
 
 
-PASSWORD = "a unique example passphrase"
+PASSWORD = "miners123!"
 STUDENT = {
-    "name": "Test Student", "email": "student@example.com", "password": PASSWORD
+    "name": "Test Student", "email": "student@miners.utep.edu", "password": PASSWORD
 }
 
 
@@ -47,7 +48,7 @@ def test_registration_persists_argon2id_and_hides_credentials(api, db_connection
 
 def test_duplicate_registration_preserves_existing_credentials(api, student):
     response = api.post("/auth/register", json={
-        **STUDENT, "email": "STUDENT@EXAMPLE.COM", "password": "a different example passphrase",
+        **STUDENT, "email": "STUDENT@MINERS.UTEP.EDU", "password": "Different123!",
     })
     assert response.status_code == 409
     assert api.get("/users").json() == [student]
@@ -56,7 +57,7 @@ def test_duplicate_registration_preserves_existing_credentials(api, student):
 
 def test_login_uses_expiring_opaque_token_and_current_user(api, db_connection, student):
     before = datetime.now(UTC)
-    response = sign_in(api, email="STUDENT@EXAMPLE.COM")
+    response = sign_in(api, email="STUDENT@MINERS.UTEP.EDU")
     assert response.status_code == 200
     assert response.headers["Cache-Control"] == "no-store"
     session = response.json()
@@ -128,7 +129,7 @@ def test_public_user_creation_cannot_assign_professor_role(api, path):
 def test_invalid_auth_requests_do_not_echo_passwords(api):
     short_password = "KeepMeSecret"
     invalid_registration = api.post("/auth/register", json={**STUDENT, "password": short_password})
-    invalid_login = sign_in(api, password=PASSWORD * 10)
+    invalid_login = sign_in(api, password=PASSWORD * 20)
     assert invalid_registration.status_code == invalid_login.status_code == 422
     assert short_password not in invalid_registration.text
     assert PASSWORD not in invalid_login.text
@@ -136,7 +137,7 @@ def test_invalid_auth_requests_do_not_echo_passwords(api):
 
 
 def test_legacy_account_requires_trusted_provisioning(api, db_connection):
-    email = "legacy@example.com"
+    email = "legacy@utep.edu"
     existing = api.post("/users", json={"name": "Legacy User", "email": email})
     assert existing.status_code == 201
     user_id = existing.json()["id"]
@@ -156,7 +157,7 @@ def test_legacy_account_requires_trusted_provisioning(api, db_connection):
 
 
 def test_trusted_provisioning_can_create_professor(api, db_connection):
-    email = "professor@example.com"
+    email = "professor@utep.edu"
     with Session(db_connection, join_transaction_mode="create_savepoint") as db:
         provision_account(db, email=email, password=PASSWORD, role="Professor", name="Professor")
     session = sign_in(api, email=email)
@@ -164,3 +165,70 @@ def test_trusted_provisioning_can_create_professor(api, db_connection):
     assert api.get("/auth/me", headers=bearer(session.json()["access_token"])).json() == {
         **api.get("/users").json()[0], "account_role": "Professor",
     }
+
+
+def test_utep_registration_normalizes_email(api):
+    response = api.post("/auth/register", json={**STUDENT, "email": " Student@UTEP.EDU "})
+    assert response.status_code == 201
+    assert response.json()["email"] == "student@utep.edu"
+    assert sign_in(api, email="student@utep.edu").status_code == 200
+
+
+@pytest.mark.parametrize("path", ["/auth/register", "/users"])
+@pytest.mark.parametrize("email", [
+    "student@gmail.com",
+    "student@fakeutep.edu",
+    "student@miners.utep.edu.fake.com",
+    "invalid",
+])
+def test_public_account_creation_requires_university_email(api, path, email):
+    payload = {"name": STUDENT["name"], "email": email}
+    if path == "/auth/register":
+        payload["password"] = PASSWORD
+    assert api.post(path, json=payload).status_code == 422
+    assert api.get("/users").json() == []
+
+
+@pytest.mark.parametrize("password", ["Test1!", "a" * 127 + "1!", "password!", "password1 "])
+def test_registration_rejects_invalid_passwords(api, password):
+    response = api.post("/auth/register", json={**STUDENT, "password": password})
+    assert response.status_code == 422
+    assert password not in response.text
+    assert api.get("/users").json() == []
+
+
+@pytest.mark.parametrize("password", ["abcdef1!", "A" * 126 + "1@"])
+def test_registration_accepts_password_boundaries(api, password):
+    assert api.post("/auth/register", json={**STUDENT, "password": password}).status_code == 201
+    assert sign_in(api, password=password).status_code == 200
+
+
+@pytest.mark.parametrize(("email", "password"), [
+    ("professor@example.com", PASSWORD),
+    ("professor@utep.edu", "legacy passphrase"),
+])
+def test_trusted_provisioning_requires_new_account_policy(db_connection, email, password):
+    with Session(db_connection, join_transaction_mode="create_savepoint") as db:
+        with pytest.raises(ValueError):
+            provision_account(db, email=email, password=password, role="Professor", name="Professor")
+        assert db.scalar(select(User.id)) is None
+
+
+@pytest.mark.parametrize("role", ["Student", "Professor"])
+def test_existing_credentials_work_without_new_account_policy(api, db_connection, role):
+    email = "existing@example.com"
+    password = "legacy passphrase"
+    db_connection.execute(User.__table__.insert().values(
+        name="Existing User", email=email, account_role=role,
+        password_hash=PASSWORD_HASHER.hash(password),
+    ))
+    response = sign_in(api, email=email, password=password)
+    assert response.status_code == 200
+    assert api.get("/auth/me", headers=bearer(response.json()["access_token"])).json()["account_role"] == role
+
+
+def test_development_user_route_does_not_echo_unexpected_password(api):
+    response = api.post("/users", json=STUDENT)
+    assert response.status_code == 422
+    assert PASSWORD not in response.text
+    assert api.get("/users").json() == []

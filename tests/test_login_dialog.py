@@ -37,14 +37,14 @@ def fill_and_submit(dialog, email, password):
     dialog.sign_in_button.click()
 
 
-def test_password_field_is_masked(qt_app):
-    dialog = LoginDialog(Mock())
+def test_password_field_is_masked(qt_widget):
+    dialog = qt_widget(LoginDialog, Mock())
     assert dialog.password_input.echoMode() == QLineEdit.EchoMode.Password
 
 
-def test_empty_fields_do_not_call_api(qt_app):
+def test_empty_fields_do_not_call_api(qt_widget):
     api_client = Mock()
-    dialog = LoginDialog(api_client)
+    dialog = qt_widget(LoginDialog, api_client)
 
     fill_and_submit(dialog, "  ", "")
 
@@ -53,10 +53,10 @@ def test_empty_fields_do_not_call_api(qt_app):
     assert not dialog.error_label.isHidden()
 
 
-def test_successful_login_accepts_and_stores_user(qt_app):
+def test_successful_login_accepts_and_stores_user(qt_widget):
     api_client = Mock()
     api_client.get_current_user.return_value = STUDENT
-    dialog = LoginDialog(api_client)
+    dialog = qt_widget(LoginDialog, api_client)
 
     fill_and_submit(dialog, " s@example.com ", "a long enough password")
 
@@ -69,10 +69,10 @@ def test_successful_login_accepts_and_stores_user(qt_app):
 
 
 @pytest.mark.parametrize("status_code", [401, 422])
-def test_bad_credentials_show_generic_error(qt_app, status_code):
+def test_bad_credentials_show_generic_error(qt_widget, status_code):
     api_client = Mock()
     api_client.login.side_effect = http_status_error(status_code)
-    dialog = LoginDialog(api_client)
+    dialog = qt_widget(LoginDialog, api_client)
 
     fill_and_submit(dialog, "s@example.com", "wrong password")
 
@@ -84,10 +84,10 @@ def test_bad_credentials_show_generic_error(qt_app, status_code):
     api_client.clear_session.assert_called_once()
 
 
-def test_server_down_shows_connection_error(qt_app):
+def test_server_down_shows_connection_error(qt_widget):
     api_client = Mock()
     api_client.login.side_effect = httpx.ConnectError("refused")
-    dialog = LoginDialog(api_client)
+    dialog = qt_widget(LoginDialog, api_client)
 
     fill_and_submit(dialog, "s@example.com", "a long enough password")
 
@@ -100,16 +100,16 @@ def test_server_down_shows_connection_error(qt_app):
     [(STUDENT, "Student Dashboard"), (PROFESSOR, "Professor Dashboard")],
     ids=["student", "professor"],
 )
-def test_main_window_routes_by_role(qt_app, user, expected_title):
-    window = MainWindow(window_api_client(), user)
+def test_main_window_routes_by_role(qt_widget, user, expected_title):
+    window = qt_widget(MainWindow, window_api_client(), user)
 
     assert window.dashboard_title.text() == expected_title
     assert window.pages.currentIndex() == 0
 
 
-def test_sign_out_revokes_session(qt_app):
+def test_sign_out_revokes_session(qt_widget):
     api_client = window_api_client()
-    window = MainWindow(api_client, STUDENT)
+    window = qt_widget(MainWindow, api_client, STUDENT)
     signals = []
     window.signed_out.connect(lambda: signals.append(True))
 
